@@ -16,7 +16,6 @@
 """GraphQL resolvers for use in data accessing and mutation of workflows."""
 
 import asyncio
-from functools import partial
 from getpass import getuser
 import os
 from copy import deepcopy
@@ -232,8 +231,7 @@ class Services:
         log.info(f'Cleaning {" ".join(workflow_ids)}')
         try:
             await asyncio.get_event_loop().run_in_executor(
-                executor,
-                partial(_clean, workflow_ids, opts=opts),
+                executor, _clean, workflow_ids, opts
             )
         except Exception as exc:
             if isinstance(exc, ServiceFileError):  # Expected error
