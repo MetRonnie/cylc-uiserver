@@ -20,7 +20,7 @@ extra functionality specific to the UIS.
 """
 
 from functools import partial
-from typing import TYPE_CHECKING, Any, List, Optional
+from typing import TYPE_CHECKING, Any, List, Optional, cast
 
 import graphene
 from graphene.types.generic import GenericScalar
@@ -33,7 +33,6 @@ from cylc.flow.workflow_files import WorkflowFiles
 from cylc.flow.network.schema import (
     NODE_MAP,
     CyclePoint,
-    GenericResponse,
     SortArgs,
     Task,
     Job,
@@ -54,6 +53,7 @@ from cylc.uiserver.resolvers import (
 )
 
 if TYPE_CHECKING:
+    from graphene.types.definitions import GrapheneGraphQLType
     from graphql import ResolveInfo
 
 
@@ -77,8 +77,10 @@ async def mutator(
     resolvers: 'Resolvers' = (
         info.context.get('resolvers')  # type: ignore[union-attr]
     )
-    res = await resolvers.service(info, command, parsed_workflows, kwargs)
-    return GenericResponse(result=res)
+    res = await resolvers.service(command, parsed_workflows, kwargs)
+    return cast('GrapheneGraphQLType', info.return_type).graphene_type(
+        result=res
+    )
 
 
 class RunMode(graphene.Enum):

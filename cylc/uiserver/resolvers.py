@@ -471,6 +471,7 @@ class Resolvers(BaseResolvers):
         executor,
         **kwargs
     ):
+        import debugpy; debugpy.listen(6678); print('Waiting for debugger attach'); debugpy.wait_for_client()
         super().__init__(data)
         self.log = log
         self.workflows_mgr = workflows_mgr
@@ -498,10 +499,12 @@ class Resolvers(BaseResolvers):
         }
         w_ids = [
             flow[WORKFLOW].id
-            for flow in await self.get_workflows_data(w_args)]
+            for flow in await self.get_workflows_data(w_args)
+        ]
         if not w_ids:
             return [{
-                'response': (False, 'No matching workflows')}]
+                'response': (False, 'No matching workflows')
+            }]
         # Pass the request to the workflow GraphQL endpoints
         _, variables, _, _ = info.context.get(  # type: ignore[union-attr]
             'graphql_params'
@@ -515,13 +518,27 @@ class Resolvers(BaseResolvers):
             'request_string': print_ast(operation_ast),
             'variables': variables,
         }
-        return await self.workflows_mgr.multi_request(  # type: ignore # TODO
+        results = await self.workflows_mgr.multi_request(
             'graphql', w_ids, graphql_args, req_meta=req_meta
         )
+        if not results:
+            return [{
+                'response': (False, "No matching workflows running")
+            }]
+        ret: List[Dict[str, Any]] = []
+        for result in results:
+            if not isinstance(result, dict):
+                raise TypeError(
+                    "Expected to receive GraphQL response dict "
+                    f"but received: {result!r}"
+                )
+            # if not result.get('data'):
+            #     raise ValueError(f"Unexpected response: {result}")
+            ret.extend(result[info.field_name]['result'])
+        return ret
 
     async def service(
         self,
-        info: 'ResolveInfo',
         command: str,
         workflows: Iterable['Tokens'],
         kwargs: Dict[str, Any],
