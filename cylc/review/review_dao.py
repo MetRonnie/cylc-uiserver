@@ -237,7 +237,7 @@ class CylcReviewDAO:
         offset -- Offset entry number
         flow_nums -- whether to use flow_nums
 
-        Return (entries, of_n_entries) where:
+        Return (entries, of_n_entries, eight_zero_warning) where:
         entries -- A list of matching entries
         of_n_entries -- Total number of entries matching query
         Each entry is a dict:
@@ -262,15 +262,12 @@ class CylcReviewDAO:
             + " FROM task_states LEFT JOIN task_jobs USING (name, cycle)"
             + where_expr
         )
-        try:
-            for row in self._db_exec(user_name, suite_name, stmt, where_args):
-                of_n_entries = row[0]
-                break
-            else:
-                self._db_close(user_name, suite_name)
-                return ([], 0, self.is_cylc8)
-        except sqlite3.Error:
-            return ([], 0, self.is_cylc8)
+        for row in self._db_exec(user_name, suite_name, stmt, where_args):
+            of_n_entries = row[0]
+            break
+        else:
+            self._db_close(user_name, suite_name)
+            return ([], 0, False)
         if self.is_cylc8:
             stmt = (   # nosec B608
                 "SELECT" +
