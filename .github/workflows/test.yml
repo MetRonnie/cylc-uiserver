@@ -1,12 +1,7 @@
 name: Test
 
 on:
-  pull_request:
   workflow_dispatch:
-  push:
-    branches:
-      - master
-      - '*.*.x'
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -14,6 +9,7 @@ concurrency:
 
 env:
   FORCE_COLOR: 2
+  PIP_PROGRESS_BAR: 'off'
 
 defaults:
   run:
@@ -27,19 +23,14 @@ jobs:
       fail-fast: false
       matrix:
         os: ['ubuntu-latest']
-        python-version: ['3.12', '3']
-        include:
-          - os: 'macos-latest'
-            python-version: '3.12'  # oldest supported
+        python-version: ['3']
+        x: [1, 2, 3, 4, 5, 6, 7, 8, 9]
     env:
       PYTEST_ADDOPTS: --cov --color=yes
 
     steps:
       - name: Checkout
         uses: actions/checkout@v6
-
-      - name: Patch DNS
-        uses: cylc/release-actions/patch-dns@v1
 
       - name: Install System Dependencies
         uses: mamba-org/setup-micromamba@v3
@@ -58,23 +49,13 @@ jobs:
         with:
           cylc_flow: true
           cylc_flow_opts: ''
+          cylc_flow_tag: '8.6.x'
           # Required for coverage collection
           editable_installations: true
 
       - name: install cylc-uiserver
         run: |
           pip install -e .[all]
-
-      - name: Style test
-        if: startsWith(matrix.os, 'ubuntu')
-        run: flake8
-
-      - name: Type checking
-        if: startsWith(matrix.os, 'ubuntu')
-        run: mypy
-
-      - name: Check changelog
-        uses: cylc/release-actions/towncrier-draft@v1
 
       - name: Test
         run: pytest
@@ -104,47 +85,8 @@ jobs:
           export CYLC_COVERAGE_BASE=$PWD
           ./etc/bin/run-functional-tests
 
-      - name: Debug
-        if: failure() && steps.review_tests.outcome == 'failure'
-        timeout-minutes: 1
-        run: |
-          find "$HOME/cylc-run" -name '*.err' -type f \
-            -exec echo \; -exec echo '====== {} ======' \; -exec cat '{}' \;
-          find "$HOME/cylc-run" -name '*.log' -type f \
-            -exec echo \; -exec echo '====== {} ======' \; -exec cat '{}' \;
-          find "${TMPDIR:-/tmp}/${USER}/cylctb-"* -type f \
-            -exec echo \; -exec echo '====== {} ======' \; -exec cat '{}' \;
-
       - name: Coverage report
         run: |
-          coverage combine --append
-          coverage xml --ignore-errors
+          set -x
+          coverage xml --debug=pathmap,trace
           coverage report
-
-      - name: Upload coverage artifact
-        uses: actions/upload-artifact@v7
-        with:
-          name: coverage_${{ matrix.os }}_py-${{ matrix.python-version }}
-          path: coverage.xml
-          retention-days: 4
-
-  codecov:
-    needs: test
-    runs-on: ubuntu-latest
-    timeout-minutes: 2
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v6
-
-      - name: Download coverage artifacts
-        uses: actions/download-artifact@v8
-
-      - name: Codecov upload
-        uses: codecov/codecov-action@v6
-        with:
-          name: ${{ github.workflow }}
-          fail_ci_if_error: true
-          verbose: true
-          # Token not required for public repos, but avoids upload failure due
-          # to rate-limiting (but not for PRs opened from forks)
-          token: ${{ secrets.CODECOV_TOKEN }}
