@@ -31,9 +31,7 @@ omit =
     cylc/uiserver/jupyter*_config.py
 parallel = True
 timid = False
-include=
-    cylc/uiserver/*
-    cylc/review/*
+source = ./cylc
 
 
 [report]
