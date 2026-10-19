@@ -46,5 +46,15 @@ class RotatingUISFileHandler(RotatingFileHandler):
 
         # Remove any old naming scheme log files
         for old_log in Path(filename).parent.glob('[0-9][0-9]-uiserver.log'):
+            # old-style log files
             with suppress(OSError):
                 old_log.unlink()
+        for old_log in Path(filename).parent.glob('log.[0-9]'):
+            # old-style rotated filenames
+            with suppress(OSError):
+                old_log.unlink()
+
+    def rotation_filename(self, default_name):
+        name, number = default_name.rsplit(".", 1)
+        path = Path(name)
+        return str(path.parent / f"{path.stem}-{int(number):02d}{path.suffix}")
