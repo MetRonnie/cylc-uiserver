@@ -220,13 +220,15 @@ class TornadoSubscriptionServer:
 
             case OperationType.SUBSCRIBE.value:
                 if not isinstance(payload, dict):
-                    raise AssertionError("The payload must be a dict")
-                assert op_id, "The message must have an operation ID"
+                    raise TypeError("The payload must be a dict")
+                if not op_id:
+                    raise ValueError("The message must have an operation ID")
                 params = self.get_graphql_params(connection_context, payload)
                 await self.on_subscribe(connection_context, op_id, params)
 
             case OperationType.COMPLETE.value:
-                assert op_id, "The message must have an operation ID"
+                if not op_id:
+                    raise ValueError("The message must have an operation ID")
                 await connection_context.unsubscribe(op_id)
                 connection_context.request_context['sub_statuses'][op_id] = (
                     'stop'
@@ -400,7 +402,6 @@ class TornadoSubscriptionServer:
     def build_message(
         op_type: SendOperationType, op_id: str | None, payload
     ):
-        assert op_type, "Message must have a type"
         message: dict[str, Any] = {"type": str(op_type)}
         if op_id is not None:
             message["id"] = op_id
@@ -434,7 +435,7 @@ class TornadoSubscriptionServer:
         try:
             parsed_message = json.loads(message)
             if not isinstance(parsed_message, dict):
-                raise AssertionError("Message must be an object")
+                raise TypeError("Message must be an object")
         except Exception as e:
             connection_context.ws.close(4400, str(e))
             return None
