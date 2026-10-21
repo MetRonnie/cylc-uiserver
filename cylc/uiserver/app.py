@@ -73,7 +73,9 @@ log-file viewer. To enable Cylc Review, add the following to your
 """
 
 from concurrent.futures import ProcessPoolExecutor
+from copy import deepcopy
 import getpass
+import logging
 import os
 from pathlib import (
     Path,
@@ -105,7 +107,7 @@ from traitlets import (
 )
 from traitlets.config.loader import LazyConfigValue
 
-from cylc.flow import LOG as CYLC_LOG
+from cylc.flow import CYLC_LOG
 from cylc.flow.network.graphql import (
     CylcExecutionContext,
     IgnoreFieldMiddleware,
@@ -506,18 +508,24 @@ class CylcUIServer(ExtensionApp):
 
         self.settings.update({'<trait>':...})
         """
+        # modify the logging config to reflect the log level
+        log_level = logging.getLevelName(self.log_level)
+        config = deepcopy(self.logging_config)  # for traitlets reactivity
+        for logger in (self.log.name, CYLC_LOG):
+            config.setdefault(
+                'loggers', {}
+            ).setdefault(
+                logger, {}
+            ).setdefault(
+                'level', log_level
+            )
+        self.logging_config = config
+
         super().initialize_settings()
 
         # startup messages
         self.log.info(f"Starting Cylc UI Server {__version__}")
         self.log.info(f"Serving UI from: {self.ui_path}")
-
-        try:
-            for logger in (self.log, CYLC_LOG):
-                logger.setLevel(self.log_level)
-        except Exception as exc:
-            self.log.warning(exc)
-
         self.log.debug(
             "CylcUIServer config:\n"
             f"{pformat(self.config.CylcUIServer, indent=2)}"
